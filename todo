@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+const chalk = require('chalk');
+const args = process.argv;
+
+const commands = ['new', 'get', 'complete', 'help'];
+
+//usage represents the help guide
+const usage = function() {
+	const usageText = `
+	todo helps you manage your todo tasks.
+
+	usage:
+		todo <command>
+
+		commands can be:
+
+		new:		used to create a new todo
+		get:		used to retrieve your todos
+		complete:	used to mark a todo as complete
+		help: 		used to print the usage guide
+	`;
+
+	console.log(usageText);
+}
+
+//used to log errors to the console in red
+function errorLog(error) {
+	var eLog = chalk.red(error);
+	console.log(eLog);
+}
+
+//Log an error if more than one argument is passed
+if (args.length > 3) {
+	errorLog('Only one argument can be accepted!');
+	usage();
+}
+
+if (commands.indexOf(args[2]) == -1) {
+	errorLog('Invalid command passed!');
+	usage();
+}
+
+
