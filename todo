@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 
 const chalk = require('chalk');
-const args = process.argv;
+const rl = require('readline');
+const low = require('lowdb');
+const FileSync = require('lowdb/adapters/FileSync');
 
-const commands = ['new', 'get', 'complete', 'help'];
+const adapter = new FileSync('db.json');
+const db = low(adapter);
+//Set some defaults, required if JSON file is empty
+db.defaults({ todos: [] }).write();
+
+const args = process.argv;
 
 //usage represents the help guide
 const usage = function() {
@@ -15,10 +22,11 @@ const usage = function() {
 
 		commands can be:
 
-		new:		used to create a new todo
-		get:		used to retrieve your todos
-		complete:	used to mark a todo as complete
-		help: 		used to print the usage guide
+		new:		used to create a new task	| ex: ./todo new
+		get:		used to retrieve your tasks	| ex: ./todo get
+		complete:	used to mark a task as complete	| ex: ./todo complete 1
+		remove:		used to remove a task		| ex: ./todo remove 
+		help: 		used to print the usage guide	| ex: ./todo help 
 	`;
 
 	console.log(usageText);
@@ -30,15 +38,92 @@ function errorLog(error) {
 	console.log(eLog);
 }
 
-//Log an error if more than one argument is passed
-if (args.length > 3) {
-	errorLog('Only one argument can be accepted!');
-	usage();
+//Prompt the user and then read the output
+function prompt(question) {
+	var r = rl.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		terminal: false
+	});
+	return new Promise( function(resolve,error) {
+		r.question(question, function(answer) {
+			r.close();
+			resolve(answer);
+		});
+	});
 }
 
-if (commands.indexOf(args[2]) == -1) {
-	errorLog('Invalid command passed!');
-	usage();
+function newTodo() {
+	const q = chalk.yellow('Type in your todo\n');
+	prompt(q).then( function(todo) {
+		//Add the todo to the JSON file
+		db.get('todos')
+			.push({
+				title: todo,
+				complete: false
+			}).write();
+	});
 }
 
+function getTodo() {
+	const todos = db.get('todos').value();
+	let index = 1;
+	todos.forEach( function(todo) {
+		var todoText = `${index++}. ${todo.title}`;
+		if( todo.complete == true ) {
+			todoText = chalk.green(todoText);
+		}
+		console.log(todoText);
+	});
+}
 
+function todoComplete(taskNumber) {
+	db.set(`todos[${taskNumber-1}].complete`, true).write();
+	var log = chalk.green(`Task number ${taskNumber} has been completed!`);
+	console.log(log);
+	getTodo();
+}
+
+function todoRemove() {
+	getTodo();
+	const q = chalk.magenta('Enter the task number that you would like to remove.\n');
+	prompt(q).then( function(taskNumber) {
+		//Get the Title Text of the task to be deleted
+		var titleToDelete = db.get(`todos[${taskNumber-1}].title`).value();
+
+		//Delete the task object from the array
+		db.get('todos')
+			.remove( {title: `${titleToDelete}`} )
+			.write();
+		
+		//Write a confirmation to the user
+		console.log(chalk.magenta(`\nTask number ${taskNumber} has been removed!`));
+	});
+}
+
+//Handle all the input cases
+switch(args[2]) {
+	case 'help':
+		usage();
+		break;
+	case 'new':
+		newTodo();
+		break;
+	case 'get':
+		getTodo()
+		break;
+	case 'complete':
+		if( !args[3] ) {
+			errorLog('Invalid command passed!');
+			usage();
+			break
+		}
+		todoComplete(args[3]);
+		break;
+	case 'remove':
+		todoRemove();
+		break;
+	default:
+		errorLog('Invalid command passed!');
+		usage();
+}
